@@ -1,0 +1,2 @@
+ZUMO_PORT: '/dev/ttyACM1'
+ZUMO_BAUDRATE : '57600'
