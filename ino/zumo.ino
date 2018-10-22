@@ -72,7 +72,6 @@ void recvWithStartEndMarkers() {
 
     while (Serial.available() > 0 && newData == false) {
         rc = Serial.read();
-
         if (recvInProgress == true) {
             if (rc != endMarker) {
                 receivedChars[ndx] = rc;

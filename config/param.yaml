@@ -1,2 +1,5 @@
 ZUMO_PORT: '/dev/ttyACM1'
 ZUMO_BAUDRATE : '9600'
+#PORT (BLuetooth)
+#MAC ADRESSE
+#HC06

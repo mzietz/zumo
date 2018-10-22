@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 
 
-import serial
+#import serial
+import bluetooth
+import time
 from math import sqrt
 import rospy
 from time import sleep
@@ -24,56 +26,74 @@ class Zumo:
 		except:
 			rospy.set_param('ZUMO_BAUDRATE',"9600")
 			self.BAUDRATE=rospy.get_param('ZUMO_BAUDRATE')
+
+		self.sock=bluetooth.BluetoothSocket( bluetooth.RFCOMM )
+		self.port=1
 		self.TIMEOUT=0.1
 		self.lock=Lock()
 		self.message = list()
 		self.p=Imu()
 		self.p.header.stamp = rospy.Time.now()
 		self.p.header.frame_id="map"
-		try:
-			self.ser = serial.Serial( self.PORT, self.BAUDRATE,timeout=self.TIMEOUT)
-			sleep(1)
-			rospy.loginfo("Connection established at "+str(self.PORT))
+#		try:
+#			self.ser = serial.Serial( self.PORT, self.BAUDRATE,timeout=self.TIMEOUT)
+#			sleep(1)
+#			rospy.loginfo("Connection established at "+str(self.PORT))
 
-		except:
-			rospy.loginfo("Try to connect")
+#		except:
+#			rospy.loginfo("Try to connect")
 			
-	def __delete__(self):
-		self.ser.close()
-		print "Connection lost"
+#	def __delete__(self):
+#		self.ser.close()
+#		print "Connection lost"
+
+	def connect_to_bluetooth(self, device_name, device_mac):
+		nearby_devices = bluetooth.discover_devices()
+		for bdaddr in nearby_devices:
+			if device_name == bluetooth.lookup_name( bdaddr ):
+				device_mac = bdaddr
+				break
+
+		if device_mac is not None:
+			rospy.loginfo("found target bluetooth device with address "+device_mac)
+		else:
+			rospy.loginfo("could not find target bluetooth device nearby")
+
+		try:
+			self.sock.connect((device_mac, self.port))
+		except:
+			rospy.loginfo("Failed to connect to"+ device_mac)
+
 		
 	def get_message(self):
 		with self.lock: 
 			try:
 				self.ser.flush()
-				sleep(0.001)
-				line = self.ser.readline() # reception trame accelero/magneto/gyro
+				sleep(0.001) 
+				line = self.ser.readline() 
 				if len(line)>0:
 					if line.startswith('!AN'):
 						line = line.replace("!AN:", "")
 						line = line.replace("\r\n", "")
 						self.message=line.split(',')
-						#rospy.loginfo( "Got message : "+str(self.message))
 						self.pubimu()
 			except:
 				rospy.loginfo("Failed getting message !")
 
-	def cmd_to_serial(self,cmd_speed,cmd_angle):
+	def cmd_to_bluetooth(self,cmd_speed,cmd_angle):
 		with self.lock:
 			vmax=400 #max speed zumo
-			#cmd_msg="~X;"+str(int (cmd_speed*100))+";"+str(int (cmd_angle*100))+";#"
-			cmd_msg="<Command,"+str(int(cmd_speed*vmax))+","+str(int(cmd_angle*vmax))+">"
-			self.ser.flush()
+			cmd_msg="<Command,"+str(int(cmd_speed))+","+str(int(cmd_angle))+">"
 			sleep(0.001)
 			try :
-				self.ser.write(cmd_msg)
-				rospy.loginfo(cmd_msg)
+				self.sock.send(cmd_msg)
+				rospy.loginfo( "SEndMessage !"+cmd_msg)
+
 			except :
 				rospy.loginfo( "falied to convert !")
 
 	def cb_cmdvel(self,msg):
-		self.cmd_to_serial(msg.linear.x,msg.angular.z)
-		#rospy.loginfo("Got message !")
+		self.cmd_to_bluetooth(msg.linear.x,msg.angular.z)
 
 
 	def pubimu(self):
@@ -90,13 +110,11 @@ if __name__=="__main__":
 	print "Starting"
 	rospy.init_node("zumo")
 	myZumo=Zumo()
-
+	myZumo.connect_to_bluetooth("HC06", "00:21:13:00:2F:7E")
 	while not rospy.is_shutdown():
-		myZumo.get_message()
 		sleep(0.001)
 
 	rospy.loginfo("Node terminated")
 	rospy.delete_param("ZUMO_BAUDRATE")
 	rospy.delete_param("ZUMO_PORT")
-	myZumo.ser.close()
 	rospy.loginfo("Connection lost")
