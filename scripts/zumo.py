@@ -12,6 +12,7 @@ from sensor_msgs.msg import Imu
 class Zumo:
 	"""docstring for Zumo"""
 	def __init__(self):
+		self.sub_cmd=rospy.Subscriber("/cmd_vel",Twist,self.cb_cmdvel)
 		self.pub_imu=rospy.Publisher("/imu", Imu, queue_size=10)
 		try:
 			self.PORT=rospy.get_param('ZUMO_PORT')
@@ -43,8 +44,6 @@ class Zumo:
 		
 	def get_message(self):
 		with self.lock: 
-		#si je rentre dedans je prends le lock et personne ne peut le prendre permet de gerer 
-		#les conflits de com sur le port serie, un seul dessus a la fois
 			try:
 				self.ser.flush()
 				sleep(0.001)
@@ -54,10 +53,28 @@ class Zumo:
 						line = line.replace("!AN:", "")
 						line = line.replace("\r\n", "")
 						self.message=line.split(',')
-						rospy.loginfo( "Got message : "+str(self.message))
+						#rospy.loginfo( "Got message : "+str(self.message))
 						self.pubimu()
 			except:
 				rospy.loginfo("Failed getting message !")
+
+	def cmd_to_serial(self,cmd_speed,cmd_angle):
+		with self.lock:
+			vmax=400 #max speed zumo
+			#cmd_msg="~X;"+str(int (cmd_speed*100))+";"+str(int (cmd_angle*100))+";#"
+			cmd_msg="<Command,"+str(int(cmd_speed*vmax))+","+str(int(cmd_angle*vmax))+">"
+			self.ser.flush()
+			sleep(0.001)
+			try :
+				self.ser.write(cmd_msg)
+				rospy.loginfo(cmd_msg)
+			except :
+				rospy.loginfo( "falied to convert !")
+
+	def cb_cmdvel(self,msg):
+		self.cmd_to_serial(msg.linear.x,msg.angular.z)
+		#rospy.loginfo("Got message !")
+
 
 	def pubimu(self):
 		self.p.linear_acceleration.x= (4*9.81*float(self.message[1])/2**16)
