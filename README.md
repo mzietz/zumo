@@ -1,4 +1,4 @@
-# Zumo with ROS
+# Zumo with ROS via Bluetooth
 
-Source: 
+Sources: 
 https://github.com/Rastafouille/Zumo-ROS
