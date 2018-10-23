@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 
-#import serial
 import bluetooth
 import time
 from math import sqrt
@@ -28,24 +27,14 @@ class Zumo:
 			self.BAUDRATE=rospy.get_param('ZUMO_BAUDRATE')
 
 		self.sock=bluetooth.BluetoothSocket( bluetooth.RFCOMM )
-		self.port=1
+		self.BTport=1
 		self.TIMEOUT=0.1
 		self.lock=Lock()
 		self.message = list()
 		self.p=Imu()
 		self.p.header.stamp = rospy.Time.now()
 		self.p.header.frame_id="map"
-#		try:
-#			self.ser = serial.Serial( self.PORT, self.BAUDRATE,timeout=self.TIMEOUT)
-#			sleep(1)
-#			rospy.loginfo("Connection established at "+str(self.PORT))
-
-#		except:
-#			rospy.loginfo("Try to connect")
-			
-#	def __delete__(self):
-#		self.ser.close()
-#		print "Connection lost"
+		self.recvd_data = ""
 
 	def connect_to_bluetooth(self, device_name, device_mac):
 		nearby_devices = bluetooth.discover_devices()
@@ -60,30 +49,35 @@ class Zumo:
 			rospy.loginfo("could not find target bluetooth device nearby")
 
 		try:
-			self.sock.connect((device_mac, self.port))
+			self.sock.connect((device_mac, self.BTport))
 		except:
 			rospy.loginfo("Failed to connect to"+ device_mac)
 
-		
-	def get_message(self):
-		with self.lock: 
-			try:
-				self.ser.flush()
-				sleep(0.001) 
-				line = self.ser.readline() 
-				if len(line)>0:
-					if line.startswith('!AN'):
-						line = line.replace("!AN:", "")
-						line = line.replace("\r\n", "")
-						self.message=line.split(',')
-						self.pubimu()
-			except:
-				rospy.loginfo("Failed getting message !")
+	def load_buffer(self):
+		self.recvd_data += self.sock.recv(8192)
+
+	def read_buffer(self):
+		n=24
+		data=""
+		if len(self.recvd_data) > n*2:
+			data_start = self.recvd_data.find('<')
+			if data_start != 0:
+				data = self.recvd_data.partition('<')
+				data = data[2]
+				data_end = data.find('>')
+				data_msg = data[:data_end]
+				self.recvd_data = data[data_end+1:]
+#				rospy.loginfo("geht zuruck"+data[data_end+1:])
+#				rospy.loginfo("pub "+data_msg)
+				data_msg = data_msg.replace("Fakedata","")
+				data_msg = data_msg.replace("\r\n","")
+				self.message=data_msg.split(',')
+				self.pubimu()
 
 	def cmd_to_bluetooth(self,cmd_speed,cmd_angle):
 		with self.lock:
 			vmax=400 #max speed zumo
-			cmd_msg="<Command,"+str(int(cmd_speed))+","+str(int(cmd_angle))+">"
+			cmd_msg="<Command,"+str(int(cmd_speed*vmax))+","+str(int(cmd_angle*vmax))+">"
 			sleep(0.001)
 			try :
 				self.sock.send(cmd_msg)
@@ -112,6 +106,9 @@ if __name__=="__main__":
 	myZumo=Zumo()
 	myZumo.connect_to_bluetooth("HC06", "00:21:13:00:2F:7E")
 	while not rospy.is_shutdown():
+#		myZumo.get_message()
+		myZumo.load_buffer()
+		myZumo.read_buffer()
 		sleep(0.001)
 
 	rospy.loginfo("Node terminated")
