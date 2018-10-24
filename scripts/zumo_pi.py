@@ -1,8 +1,8 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 
 import serial
-import time
 from math import sqrt
 import rospy
 from time import sleep
@@ -11,71 +11,32 @@ from geometry_msgs.msg import Twist
 from sensor_msgs.msg import Imu
 
 class Zumo:
-	"""docstring for Zumo"""
 	def __init__(self):
-		self.sub_cmd=rospy.Subscriber("/cmd_vel",Twist,self.cb_cmdvel)
-		self.pub_imu=rospy.Publisher("/imu", Imu, queue_size=10)
+		self.sub_pose=rospy.Subscriber("cmd_vel",Twist,self.cb_cmdvel)
+		self.pub_imu=rospy.Publisher("/zumo/imu",Imu,queue_size=10)
 		try:
-			self.PORT=rospy.get_param('ZUMO_PORT')
+			self.PORT=rospy.get_param('ZUMO_PORT') 
 		except:
-			rospy.set_param('ZUMO_PORT',"dev/ttyACM0")
+			rospy.set_param('ZUMO_PORT',"/dev/ttyACM0")
 			self.PORT=rospy.get_param('ZUMO_PORT')
 		try:
 			self.BAUDRATE=rospy.get_param('ZUMO_BAUDRATE') 
 		except:
 			rospy.set_param('ZUMO_BAUDRATE',"9600")
 			self.BAUDRATE=rospy.get_param('ZUMO_BAUDRATE')
-
 		self.TIMEOUT=0.1
 		self.lock=Lock()
 		self.message = list()
 		self.p=Imu()
 		self.p.header.stamp = rospy.Time.now()
 		self.p.header.frame_id="map"
-		try:
+		try :
 			self.ser = serial.Serial( self.PORT, self.BAUDRATE,timeout=self.TIMEOUT)
 			sleep(1)
-			rospy.loginfo("Connection established at "+str(self.PORT))
+			rospy.loginfo("connexion serie etablie sur le port "+str(self.PORT))
 		except:
-			rospy.loginfo("Try to connect")
+			rospy.loginfo("Echec connexion serie")
 
-	def connect_to_bluetooth(self, device_name, device_mac):
-		nearby_devices = bluetooth.discover_devices()
-		for bdaddr in nearby_devices:
-			if device_name == bluetooth.lookup_name( bdaddr ):
-				device_mac = bdaddr
-				break
-
-		if device_mac is not None:
-			rospy.loginfo("found target bluetooth device with address "+device_mac)
-		else:
-			rospy.loginfo("could not find target bluetooth device nearby")
-
-		try:
-			self.sock.connect((device_mac, self.BTport))
-		except:
-			rospy.loginfo("Failed to connect to"+ device_mac)
-
-	def load_buffer(self):
-		self.recvd_data += self.sock.recv(8192)
-
-	def read_buffer(self):
-		n=24
-		data=""
-		if len(self.recvd_data) > n*2:
-			data_start = self.recvd_data.find('<')
-			if data_start != 0:
-				data = self.recvd_data.partition('<')
-				data = data[2]
-				data_end = data.find('>')
-				data_msg = data[:data_end]
-				self.recvd_data = data[data_end+1:]
-#				rospy.loginfo("geht zuruck"+data[data_end+1:])
-#				rospy.loginfo("pub "+data_msg)
-				data_msg = data_msg.replace("Fakedata","")
-				data_msg = data_msg.replace("\r\n","")
-				self.message=data_msg.split(',')
-				self.pubimu()
 	def get_message(self):
 		with self.lock: 
 			try:
@@ -90,9 +51,7 @@ class Zumo:
 						rospy.loginfo( "Got message : "+str(self.message))
 						self.pubimu()
 			except:
-#				rospy.loginfo("Failed getting message !")
 				pass
-
 
 	def cmd_to_serial(self,cmd_speed,cmd_angle):
 		with self.lock:
@@ -110,7 +69,6 @@ class Zumo:
 		self.cmd_to_serial(msg.linear.x,msg.angular.z)
 		#rospy.loginfo("Got message !")
 
-
 	def pubimu(self):
 		self.p.linear_acceleration.x= (4*9.81*float(self.message[1])/2**16)
 		self.p.linear_acceleration.y=(4*9.81*float(self.message[2])/2**16)
@@ -126,10 +84,11 @@ if __name__=="__main__":
 	rospy.init_node("zumo")
 	myZumo=Zumo()
 	while not rospy.is_shutdown():
-		myZumo.get_message()
-		sleep(0.001)
+			myZumo.get_message()
+			sleep(0.001)
 
 	rospy.loginfo("Node terminated")
 	rospy.delete_param("ZUMO_BAUDRATE")
 	rospy.delete_param("ZUMO_PORT")
+	myZumo.ser.close()
 	rospy.loginfo("Connection lost")
