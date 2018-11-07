@@ -13,7 +13,7 @@ from sensor_msgs.msg import Imu
 class Zumo:
 	def __init__(self):
 		self.sub_pose=rospy.Subscriber("cmd_vel",Twist,self.cb_cmdvel)
-		self.pub_imu=rospy.Publisher("/zumo/imu",Imu,queue_size=10)
+		self.pub_imu=rospy.Publisher("/imu",Imu,queue_size=10)
 		try:
 			self.PORT=rospy.get_param('ZUMO_PORT') 
 		except:
