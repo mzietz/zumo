@@ -76,6 +76,24 @@ class Vision():
 		cv2.imshow("Video", frame)
 		cv2.imshow("Video2", resized)
 
+	def canny_alg(self):
+		ret, frame = self.video_capture.read()
+		edges = cv2.Canny(frame,100,200)
+		laplacian = cv2.Laplacian(frame,cv2.CV_64F)
+		rho = 1  # distance resolution in pixels of the Hough grid
+		theta = np.pi / 180  # angular resolution in radians of the Hough grid
+		threshold = 20  # minimum number of votes (intersections in Hough grid cell)
+		min_line_length = 100  # minimum number of pixels making up a line
+		max_line_gap = 20  # maximum gap in pixels between connectable line segments
+		line_image = np.copy(frame) * 0  # creating a blank to draw lines on
+
+		lines = cv2.HoughLinesP(edges, rho, theta, threshold, np.array([]), min_line_length, max_line_gap)
+		for x in range(0, len(lines)):
+			for x1,y1,x2,y2 in lines[x]:
+				cv2.line(frame,(x1,y1),(x2,y2),(255,0,0),2)
+		cv2.imshow("Video1", frame)
+		cv2.imshow("Video2", edges)
+
 	def segmentation(self):
 		ret, frame = self.video_capture.read()
 		# find the keypoints with ORB
@@ -163,7 +181,8 @@ class Vision():
 if __name__ == '__main__':
 	myVision= Vision()
 	while True:
-		myVision.line_detector()
+		myVision.canny_alg()
+#		myVision.line_detector()
 #		myVision.segmentation()
 #		myVision.orb_detector()
 		if cv2.waitKey(1) & 0xFF == ord('q'):
